@@ -64,6 +64,7 @@ from ...sim import Contacts, Control, Model, ModelBuilder, State
 from ..flags import SolverNotifyFlags
 from ..solver import SolverBase
 from .sph_kernels import (
+    apply_domain_boundaries,
     compute_cohesion_force,
     compute_density,
     compute_pressure,
@@ -140,6 +141,9 @@ class SolverSPH(SolverBase):
         friction_coeff: float = 0.5,
         sound_speed: float = 50.0,
         enable_rigid_coupling: bool = True,
+        domain_min: wp.vec3 | None = None,
+        domain_max: wp.vec3 | None = None,
+        boundary_damping: float = 0.5,
     ):
         super().__init__(model=model)
 
@@ -151,6 +155,11 @@ class SolverSPH(SolverBase):
         self.friction_coeff = friction_coeff
         self.sound_speed = sound_speed
         self.enable_rigid_coupling = enable_rigid_coupling
+
+        # Domain boundaries
+        self.domain_min = domain_min
+        self.domain_max = domain_max
+        self.boundary_damping = boundary_damping
 
         # Equation of state parameter (gamma for Tait equation)
         self.gamma = 7.0
@@ -287,6 +296,10 @@ class SolverSPH(SolverBase):
 
             # 8. Integrate particles
             self._integrate(state_in, state_out, dt)
+
+            # 9. Apply domain boundaries if specified
+            if self.domain_min is not None and self.domain_max is not None:
+                self._apply_domain_boundaries(state_out)
 
             # 10. Store SPH data in custom attributes (optional)
             self._store_sph_data(state_out)
@@ -440,6 +453,31 @@ class SolverSPH(SolverBase):
                 model.particle_max_velocity,
             ],
             outputs=[state_out.particle_q, state_out.particle_qd],
+            device=model.device,
+        )
+
+    def _apply_domain_boundaries(self, state: State) -> None:
+        """Apply domain boundary conditions (walls/floor/ceiling).
+
+        Keeps particles within the specified domain bounds using
+        reflective boundary conditions with velocity damping.
+        """
+        if self.domain_min is None or self.domain_max is None:
+            return
+
+        model = self.model
+
+        wp.launch(
+            kernel=apply_domain_boundaries,
+            dim=model.particle_count,
+            inputs=[
+                state.particle_q,
+                state.particle_qd,
+                self.domain_min,
+                self.domain_max,
+                self.boundary_damping,
+            ],
+            outputs=[state.particle_q, state.particle_qd],
             device=model.device,
         )
 

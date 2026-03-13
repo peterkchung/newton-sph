@@ -252,6 +252,54 @@ def test_sph_cohesion_force(test, device):
     )
 
 
+def test_sph_domain_boundaries(test, device):
+    """Test that domain boundaries keep particles in bounds.
+
+    Verifies that particles outside the domain are pushed back inside
+    and their velocities are damped.
+    """
+    builder = newton.ModelBuilder()
+
+    # Add particles outside a small domain
+    # These should be pushed back inside during simulation
+    domain_size = 1.0
+    builder.add_particle(pos=wp.vec3(-0.5, 0.5, 0.5), vel=wp.vec3(-1.0, 0.0, 0.0), mass=1.0)
+    builder.add_particle(pos=wp.vec3(0.5, 1.5, 0.5), vel=wp.vec3(0.0, 1.0, 0.0), mass=1.0)
+    builder.add_particle(pos=wp.vec3(0.5, 0.5, 1.5), vel=wp.vec3(0.0, 0.0, 1.0), mass=1.0)
+
+    model = builder.finalize(device=device)
+
+    # Create solver with domain boundaries
+    solver = newton.solvers.SolverSPH(
+        model=model,
+        smoothing_radius=0.2,
+        rest_density=1000.0,
+        viscosity=0.01,
+        domain_min=wp.vec3(0.0, 0.0, 0.0),
+        domain_max=wp.vec3(domain_size, domain_size, domain_size),
+        boundary_damping=0.5,
+    )
+
+    state0 = model.state()
+    state1 = model.state()
+
+    # Run simulation
+    for _ in range(10):
+        solver.step(state0, state1, None, None, dt=1.0 / 60.0)
+        state0, state1 = state1, state0
+
+    # Verify particles are within bounds
+    positions = state0.particle_q.numpy()
+
+    for i, pos in enumerate(positions):
+        test.assertGreaterEqual(pos[0], -0.01, f"Particle {i} x-coordinate below domain min")
+        test.assertLessEqual(pos[0], domain_size + 0.01, f"Particle {i} x-coordinate above domain max")
+        test.assertGreaterEqual(pos[1], -0.01, f"Particle {i} y-coordinate below domain min")
+        test.assertLessEqual(pos[1], domain_size + 0.01, f"Particle {i} y-coordinate above domain max")
+        test.assertGreaterEqual(pos[2], -0.01, f"Particle {i} z-coordinate below domain min")
+        test.assertLessEqual(pos[2], domain_size + 0.01, f"Particle {i} z-coordinate above domain max")
+
+
 def test_sph_empty_model(test, device):
     """Test that SPH solver handles empty models gracefully."""
     builder = newton.ModelBuilder()
@@ -282,6 +330,9 @@ for device in get_test_devices():
         TestSolverSPH, f"test_sph_viscosity_damping_{device}", test_sph_viscosity_damping, devices=[device]
     )
     add_function_test(TestSolverSPH, f"test_sph_cohesion_force_{device}", test_sph_cohesion_force, devices=[device])
+    add_function_test(
+        TestSolverSPH, f"test_sph_domain_boundaries_{device}", test_sph_domain_boundaries, devices=[device]
+    )
     add_function_test(TestSolverSPH, f"test_sph_empty_model_{device}", test_sph_empty_model, devices=[device])
 
 

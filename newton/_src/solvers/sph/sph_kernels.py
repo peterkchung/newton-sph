@@ -454,3 +454,60 @@ def integrate_sph(
 
     x_new[tid] = x1
     v_new[tid] = v1
+
+
+# Boundary handling kernel
+@wp.kernel
+def apply_domain_boundaries(
+    particle_q: wp.array(dtype=wp.vec3),
+    particle_qd: wp.array(dtype=wp.vec3),
+    domain_min: wp.vec3,
+    domain_max: wp.vec3,
+    boundary_damping: float,
+    x_out: wp.array(dtype=wp.vec3),
+    v_out: wp.array(dtype=wp.vec3),
+):
+    """Apply simple domain boundary conditions (walls/floor/ceiling).
+
+    Particles outside the domain are pushed back inside with velocity damping.
+
+    Args:
+        particle_q: Current positions [m]
+        particle_qd: Current velocities [m/s]
+        domain_min: Minimum domain bounds [m]
+        domain_max: Maximum domain bounds [m]
+        boundary_damping: Velocity damping factor at boundaries (0-1)
+        x_out: Output positions [m]
+        v_out: Output velocities [m/s]
+    """
+    tid = wp.tid()
+    x = particle_q[tid]
+    v = particle_qd[tid]
+
+    # Check each axis and apply boundary constraints
+    # X axis
+    if x[0] < domain_min[0]:
+        x = wp.vec3(domain_min[0], x[1], x[2])
+        v = wp.vec3(wp.abs(v[0]) * boundary_damping, v[1], v[2])
+    elif x[0] > domain_max[0]:
+        x = wp.vec3(domain_max[0], x[1], x[2])
+        v = wp.vec3(-wp.abs(v[0]) * boundary_damping, v[1], v[2])
+
+    # Y axis
+    if x[1] < domain_min[1]:
+        x = wp.vec3(x[0], domain_min[1], x[2])
+        v = wp.vec3(v[0], wp.abs(v[1]) * boundary_damping, v[2])
+    elif x[1] > domain_max[1]:
+        x = wp.vec3(x[0], domain_max[1], x[2])
+        v = wp.vec3(v[0], -wp.abs(v[1]) * boundary_damping, v[2])
+
+    # Z axis
+    if x[2] < domain_min[2]:
+        x = wp.vec3(x[0], x[1], domain_min[2])
+        v = wp.vec3(v[0], v[1], wp.abs(v[2]) * boundary_damping)
+    elif x[2] > domain_max[2]:
+        x = wp.vec3(x[0], x[1], domain_max[2])
+        v = wp.vec3(v[0], v[1], -wp.abs(v[2]) * boundary_damping)
+
+    x_out[tid] = x
+    v_out[tid] = v
