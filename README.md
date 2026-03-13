@@ -14,6 +14,40 @@ Newton is a [Linux Foundation](https://www.linuxfoundation.org/) project that is
 
 Newton was initiated by [Disney Research](https://www.disneyresearch.com/), [Google DeepMind](https://deepmind.google/), and [NVIDIA](https://www.nvidia.com/).
 
+---
+
+## 🆕 SPH Solver Contribution (This Fork)
+
+**This fork adds a Weakly Compressible SPH (WCSPH) solver** for simulating granular materials like lunar regolith and fluids. The implementation includes:
+
+- **Density & Pressure Computation** - Poly6 and Spiky kernels with Tait equation of state
+- **Artificial Viscosity** - Monaghan-type viscosity for numerical stability  
+- **Granular Cohesion** - Particle bonding forces for regolith-like materials
+- **Domain Boundaries** - Reflective walls to contain simulations
+- **1611-Particle Example** - Working lunar regolith excavation demo
+
+```python
+import newton
+
+# Create SPH solver for regolith simulation
+solver = newton.solvers.SolverSPH(
+    model=model,
+    smoothing_radius=0.15,      # SPH smoothing length
+    rest_density=1500.0,        # Regolith density (kg/m³)
+    viscosity=0.05,             # Artificial viscosity
+    cohesion_stiffness=1e3,     # Granular cohesion
+)
+```
+
+Run the example:
+```bash
+python -m newton.examples sph_regolith_excavation
+```
+
+See `newton/_src/solvers/sph/` for implementation details and `newton/tests/test_solver_sph.py` for test coverage.
+
+---
+
 ## Requirements
 
 - **Python** 3.10+
