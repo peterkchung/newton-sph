@@ -4,6 +4,11 @@
 
 ### Added
 
+- Add `SolverSPH` - Weakly Compressible SPH (WCSPH) solver for granular materials and fluids
+  * Supports density computation, pressure forces, artificial viscosity, and cohesion
+  * Domain boundary handling for confined simulations
+  * Optimized for granular materials like lunar regolith
+  * Includes working example: lunar regolith excavation demo (1600+ particles)
 - Interactive example browser in the GL viewer with tree-view navigation and switch/reset support
 - Add `TetMesh` class and USD loading API for tetrahedral mesh geometry
 - Support kinematic bodies in VBD solver
