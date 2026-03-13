@@ -100,6 +100,14 @@ Supported Features
      - 🟨 no self-collision
      - ✅
      - 🟨 basic :sup:`2`
+   * - :class:`~newton.solvers.SolverSPH`
+     - Semi-implicit (WCSPH)
+     - ❌
+     - ❌
+     - ✅ SPH particles
+     - ❌
+     - ❌
+     - ❌
    * - :class:`~newton.solvers.SolverStyle3D`
      - Implicit
      - ❌
