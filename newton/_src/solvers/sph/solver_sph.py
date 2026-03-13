@@ -62,6 +62,7 @@ import warp as wp
 from ...core.types import override
 from ...sim import Contacts, Control, Model, ModelBuilder, State
 from ..flags import SolverNotifyFlags
+from ..semi_implicit.kernels_contact import eval_particle_body_contact_forces
 from ..solver import SolverBase
 from .sph_kernels import (
     compute_cohesion_force,
@@ -278,14 +279,18 @@ class SolverSPH(SolverBase):
                 # Add SPH forces to particle_f
                 wp.copy(state_out.particle_f, self.sph_forces)
 
-            # 7. Apply external forces from control/viewer (placeholder)
-            # This is where you would apply control forces
+            # 7. Apply particle-body contact forces for two-way coupling
+            if self.enable_rigid_coupling and model.body_count > 0 and contacts is not None:
+                eval_particle_body_contact_forces(
+                    model=model,
+                    state=state_in,
+                    contacts=contacts,
+                    particle_f=state_out.particle_f,
+                    body_f=state_out.body_f,
+                    body_f_in_world_frame=False,
+                )
 
-            # 8. Two-way coupling with rigid bodies (placeholder for next commit)
-            if self.enable_rigid_coupling and model.body_count > 0:
-                self._apply_rigid_coupling(state_in, state_out, contacts, dt)
-
-            # 9. Integrate particles
+            # 8. Integrate particles
             self._integrate(state_in, state_out, dt)
 
             # 10. Store SPH data in custom attributes (optional)
@@ -452,12 +457,19 @@ class SolverSPH(SolverBase):
     ) -> None:
         """Apply two-way coupling between SPH particles and rigid bodies.
 
-        This is a placeholder for the next commit which will implement:
-        - Pressure force transfer from fluid to bodies
-        - Body motion affecting nearby fluid particles
-        - Proper boundary handling at fluid-solid interface
+        DEPRECATED: Two-way coupling is now handled by standard Newton
+        particle-body contact system (eval_particle_body_contact_forces).
+        This method is kept for future specialized SPH-specific coupling.
+
+        Args:
+            state_in: Input state
+            state_out: Output state with updated body forces
+            contacts: Contact information (may be None)
+            dt: Time step
         """
-        # TODO: Implement in next commit
+        # Two-way coupling implemented via eval_particle_body_contact_forces
+        # in the main step() method. This placeholder remains for future
+        # SPH-specific boundary models (e.g., ghost particles, mirror BCs).
         pass
 
     def _store_sph_data(self, state: State) -> None:
