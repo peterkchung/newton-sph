@@ -316,6 +316,80 @@ def compute_viscosity_force(
 
     forces[tid] = force
 
+
+# Cohesion kernel for granular materials
+@wp.kernel
+def compute_cohesion_force(
+    particle_q: wp.array(dtype=wp.vec3),
+    densities: wp.array(dtype=float),
+    particle_mass: wp.array(dtype=float),
+    hash_grid: wp.uint64,
+    smoothing_radius: float,
+    cohesion_stiffness: float,
+    forces: wp.array(dtype=wp.vec3),
+):
+    """Compute cohesive bonding forces for granular materials.
+
+    Models attractive forces between particles to simulate cohesion
+    in granular materials like lunar regolith or wet sand.
+
+    The cohesion force is modeled as a simple attractive force that
+    depends on the distance between particles and a cohesion stiffness
+    parameter.
+
+    Args:
+        particle_q: Positions [m]
+        densities: Densities [kg/m³]
+        particle_mass: Masses [kg]
+        hash_grid: Hash grid ID
+        smoothing_radius: Smoothing length h
+        cohesion_stiffness: Cohesion parameter k [Pa]
+            Higher values = stronger bonding between particles
+        forces: Output forces [N]
+    """
+    tid = wp.tid()
+    x_i = particle_q[tid]
+    rho_i = densities[tid]
+
+    force = wp.vec3(0.0)
+
+    # Skip if density is too low (avoid division by zero)
+    if rho_i < 1e-6:
+        forces[tid] = force
+        return
+
+    query = wp.hash_grid_query(hash_grid, x_i, smoothing_radius)
+    index = int(0)
+
+    while wp.hash_grid_query_next(query, index):
+        if index == tid:
+            continue
+
+        x_j = particle_q[index]
+        rho_j = densities[index]
+        m_j = particle_mass[index]
+
+        r_ij = x_i - x_j
+        r_len = wp.length(r_ij)
+
+        # Apply cohesion within smoothing radius (excluding very close particles)
+        if r_len < smoothing_radius and r_len > 1e-6:
+            # Simple cohesion model: attractive force proportional to cohesion_stiffness
+            # and particle masses, decreasing with distance
+            # F = -k * m_i * m_j * (1 - r/h) * r̂
+
+            # Distance factor (linear falloff from 1 at r=0 to 0 at r=h)
+            dist_factor = 1.0 - r_len / smoothing_radius
+
+            # Cohesion force (attractive, hence negative)
+            # Magnitude scales with stiffness, masses, and distance factor
+            cohesion_magnitude = cohesion_stiffness * m_j * dist_factor / (rho_i * rho_j)
+
+            # Direction: toward neighbor (hence -r_ij direction for attraction)
+            cohesion_force = -cohesion_magnitude * wp.normalize(r_ij)
+
+            force += cohesion_force
+
     forces[tid] = force
 
 

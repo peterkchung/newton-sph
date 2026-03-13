@@ -186,6 +186,72 @@ def test_sph_viscosity_damping(test, device):
     )
 
 
+def test_sph_cohesion_force(test, device):
+    """Test that cohesion forces run correctly.
+
+    Verifies that the cohesion force computation executes without errors
+    and produces finite forces for granular material simulation.
+    """
+    builder = newton.ModelBuilder()
+
+    # Create a small cluster of particles
+    spacing = 0.1
+    smoothing_radius = 0.15
+
+    # Calculate mass for target density
+    target_density = 1500.0  # Regolith-like density
+    volume_per_particle = spacing**3
+    mass = target_density * volume_per_particle
+
+    # Add particles in a small cluster
+    pos = [
+        wp.vec3(0.0, 1.0, 0.0),
+        wp.vec3(spacing, 1.0, 0.0),
+        wp.vec3(0.0, 1.0, spacing),
+    ]
+    vel = [
+        wp.vec3(0.0, 0.0, 0.0),
+        wp.vec3(0.0, 0.0, 0.0),
+        wp.vec3(0.0, 0.0, 0.0),
+    ]
+
+    builder.add_particles(pos=pos, vel=vel, mass=[mass, mass, mass])
+    builder.add_ground_plane()
+
+    model = builder.finalize(device=device)
+
+    # Create solver with cohesion (granular material)
+    solver = newton.solvers.SolverSPH(
+        model=model,
+        smoothing_radius=smoothing_radius,
+        rest_density=target_density,
+        viscosity=0.05,
+        cohesion_stiffness=1e3,  # Enable cohesion
+        sound_speed=50.0,
+    )
+
+    state0 = model.state()
+    state1 = model.state()
+
+    # Run several steps - should not explode or produce NaN
+    for _ in range(10):
+        solver.step(state0, state1, None, None, dt=1.0 / 120.0)
+        state0, state1 = state1, state0
+
+    # Verify final state is finite (no NaN or inf)
+    positions = state0.particle_q.numpy()
+    velocities = state0.particle_qd.numpy()
+
+    test.assertTrue(
+        np.all(np.isfinite(positions)),
+        "Positions should be finite after cohesion simulation",
+    )
+    test.assertTrue(
+        np.all(np.isfinite(velocities)),
+        "Velocities should be finite after cohesion simulation",
+    )
+
+
 def test_sph_empty_model(test, device):
     """Test that SPH solver handles empty models gracefully."""
     builder = newton.ModelBuilder()
@@ -215,6 +281,7 @@ for device in get_test_devices():
     add_function_test(
         TestSolverSPH, f"test_sph_viscosity_damping_{device}", test_sph_viscosity_damping, devices=[device]
     )
+    add_function_test(TestSolverSPH, f"test_sph_cohesion_force_{device}", test_sph_cohesion_force, devices=[device])
     add_function_test(TestSolverSPH, f"test_sph_empty_model_{device}", test_sph_empty_model, devices=[device])
 
 

@@ -64,6 +64,7 @@ from ...sim import Contacts, Control, Model, ModelBuilder, State
 from ..flags import SolverNotifyFlags
 from ..solver import SolverBase
 from .sph_kernels import (
+    compute_cohesion_force,
     compute_density,
     compute_pressure,
     compute_pressure_force,
@@ -386,6 +387,32 @@ class SolverSPH(SolverBase):
                 kernel=_add_vec3_arrays,
                 dim=model.particle_count,
                 inputs=[self.sph_forces, viscosity_forces],
+                outputs=[self.sph_forces],
+                device=model.device,
+            )
+
+        # Compute cohesion forces for granular materials
+        if self.cohesion_stiffness > 0.0:
+            cohesion_forces = wp.zeros_like(self.sph_forces)
+            wp.launch(
+                kernel=compute_cohesion_force,
+                dim=model.particle_count,
+                inputs=[
+                    state.particle_q,
+                    self.densities,
+                    model.particle_mass,
+                    model.particle_grid.id if model.particle_grid else 0,
+                    self.smoothing_radius,
+                    self.cohesion_stiffness,
+                ],
+                outputs=[cohesion_forces],
+                device=model.device,
+            )
+            # Add cohesion to total force
+            wp.launch(
+                kernel=_add_vec3_arrays,
+                dim=model.particle_count,
+                inputs=[self.sph_forces, cohesion_forces],
                 outputs=[self.sph_forces],
                 device=model.device,
             )
