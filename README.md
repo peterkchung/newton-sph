@@ -8,7 +8,7 @@
 Newton is a GPU-accelerated physics simulation engine built upon [NVIDIA Warp](https://github.com/NVIDIA/warp), specifically targeting roboticists and simulation researchers.
 
 Newton extends and generalizes Warp's ([deprecated](https://github.com/NVIDIA/warp/discussions/735)) `warp.sim` module, and integrates
-[MuJoCo Warp](https://github.com/google-deepmind/mujoco_warp) as its primary backend. Newton emphasizes GPU-based computation, [OpenUSD](https://openusd.org/) support, differentiability, and user-defined extensibility, facilitating rapid iteration and scalable robotics simulation.
+[MuJoCo Warp](https://github.com/google-deepmind/mujoco_warp) as its primary backend. Newton emphasizes GPU-based computation, [OpenUSD](https://openusd.org/) support, differentiability, and user-defined extensibility, facilitating rapid iteration and scalable robotics simulation. Newton includes multiple physics solvers including **rigid body dynamics**, **finite element methods (FEM)** for soft bodies and cloth, **Material Point Method (MPM)** for granular materials, and **Smoothed Particle Hydrodynamics (SPH)** for fluid and regolith simulation.
 
 Newton is a [Linux Foundation](https://www.linuxfoundation.org/) project that is community-built and maintained. Code is licensed under [Apache-2.0](https://github.com/newton-physics/newton/blob/main/LICENSE.md). Documentation is licensed under [CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/).
 
@@ -508,6 +508,29 @@ If you installed from source with uv, substitute `uv run` for `python` in the co
     </td>
     <td align="center" width="33%">
       <code>python -m newton.examples mpm_multi_material</code>
+    </td>
+    <td align="center" width="33%">
+    </td>
+  </tr>
+  <tr>
+    <td colspan="3"><h3>SPH Examples</h3></td>
+  </tr>
+  <tr>
+    <td align="center" width="33%">
+      <a href="https://github.com/newton-physics/newton/blob/main/newton/examples/sph/example_sph_regolith_excavation.py">
+        <img width="320" src="https://raw.githubusercontent.com/newton-physics/newton/main/docs/images/examples/example_sph_regolith_excavation.jpg" alt="SPH Regolith Excavation">
+      </a>
+    </td>
+    <td align="center" width="33%">
+    </td>
+    <td align="center" width="33%">
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="33%">
+      <code>python -m newton.examples sph_regolith_excavation</code>
+    </td>
+    <td align="center" width="33%">
     </td>
     <td align="center" width="33%">
     </td>
