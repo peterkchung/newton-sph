@@ -34,6 +34,8 @@ from __future__ import annotations
 
 import warp as wp
 
+from ...geometry import ParticleFlags
+
 
 # SPH smoothing kernels
 @wp.func
@@ -336,8 +338,6 @@ def integrate_sph(
         x_new: Output positions [m]
         v_new: Output velocities [m/s]
     """
-    from newton.geometry import ParticleFlags
-
     tid = wp.tid()
 
     if (particle_flags[tid] & ParticleFlags.ACTIVE) == 0:

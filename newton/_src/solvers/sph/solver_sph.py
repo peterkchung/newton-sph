@@ -72,6 +72,17 @@ from .sph_kernels import (
 )
 
 
+@wp.kernel
+def _add_vec3_arrays(
+    a: wp.array(dtype=wp.vec3),
+    b: wp.array(dtype=wp.vec3),
+    out: wp.array(dtype=wp.vec3),
+):
+    """Helper kernel to add two vec3 arrays element-wise."""
+    tid = wp.tid()
+    out[tid] = a[tid] + b[tid]
+
+
 class SolverSPH(SolverBase):
     """Weakly Compressible SPH solver with two-way rigid body coupling.
 
@@ -179,17 +190,27 @@ class SolverSPH(SolverBase):
         Args:
             builder: The ModelBuilder to register attributes with
         """
-        builder.register_custom_attribute(
-            "sph_density",
-            dtype=float,
-            default=0.0,
-            description="SPH computed density [kg/m³]",
+        import newton  # noqa: PLC0415
+
+        builder.add_custom_attribute(
+            newton.ModelBuilder.CustomAttribute(
+                name="density",
+                frequency=newton.Model.AttributeFrequency.PARTICLE,
+                dtype=wp.float32,
+                default=0.0,
+                assignment=newton.Model.AttributeAssignment.MODEL,
+                namespace="sph",
+            )
         )
-        builder.register_custom_attribute(
-            "sph_pressure",
-            dtype=float,
-            default=0.0,
-            description="SPH pressure [Pa]",
+        builder.add_custom_attribute(
+            newton.ModelBuilder.CustomAttribute(
+                name="pressure",
+                frequency=newton.Model.AttributeFrequency.PARTICLE,
+                dtype=wp.float32,
+                default=0.0,
+                assignment=newton.Model.AttributeAssignment.MODEL,
+                namespace="sph",
+            )
         )
 
     @override
@@ -254,7 +275,7 @@ class SolverSPH(SolverBase):
             # 6. Apply SPH forces to output state
             if self.sph_forces is not None:
                 # Add SPH forces to particle_f
-                wp.copy(dst=state_out.particle_f, src=self.sph_forces)
+                wp.copy(state_out.particle_f, self.sph_forces)
 
             # 7. Apply external forces from control/viewer (placeholder)
             # This is where you would apply control forces
@@ -361,7 +382,7 @@ class SolverSPH(SolverBase):
             )
             # Add viscosity to total force
             wp.launch(
-                kernel=self._add_vec3_arrays,
+                kernel=_add_vec3_arrays,
                 dim=model.particle_count,
                 inputs=[self.sph_forces, viscosity_forces],
                 outputs=[self.sph_forces],
@@ -419,16 +440,6 @@ class SolverSPH(SolverBase):
         """
         # Custom attributes will be set when users query them
         pass
-
-    @wp.kernel
-    def _add_vec3_arrays(
-        a: wp.array(dtype=wp.vec3),
-        b: wp.array(dtype=wp.vec3),
-        out: wp.array(dtype=wp.vec3),
-    ):
-        """Helper kernel to add two vec3 arrays element-wise."""
-        tid = wp.tid()
-        out[tid] = a[tid] + b[tid]
 
     @override
     def notify_model_changed(self, flags: int) -> None:
