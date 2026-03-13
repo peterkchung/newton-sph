@@ -246,12 +246,21 @@ def compute_viscosity_force(
     particle_mass: wp.array(dtype=float),
     hash_grid: wp.uint64,
     smoothing_radius: float,
+    sound_speed: float,
     alpha: float,
     forces: wp.array(dtype=wp.vec3),
 ):
     """Compute Monaghan-type artificial viscosity.
 
-    Provides stability for shock and high-velocity flows.
+    Provides stability for shock and high-velocity flows by adding
+    dissipative forces when particles approach each other.
+
+    The viscosity term is:
+        Π_ij = (-α c̄ μ_ij + β μ_ij²) / ρ̄
+    where:
+        μ_ij = (h v_ij · r_ij) / (|r_ij|² + ε)
+        c̄ = average sound speed
+        ρ̄ = average density
 
     Args:
         particle_q: Positions [m]
@@ -260,6 +269,7 @@ def compute_viscosity_force(
         particle_mass: Masses [kg]
         hash_grid: Hash grid ID
         smoothing_radius: Smoothing length h
+        sound_speed: Numerical sound speed c [m/s]
         alpha: Viscosity coefficient (0.01-0.1 typical)
         forces: Output forces [N]
     """
@@ -286,20 +296,25 @@ def compute_viscosity_force(
         v_ij = v_i - v_j
         r_len = wp.length(r_ij)
 
-        if r_len < smoothing_radius:
-            # Viscosity term
-            mu = smoothing_radius * wp.dot(v_ij, r_ij) / (r_len * r_len + 0.01 * smoothing_radius * smoothing_radius)
+        if r_len < smoothing_radius and r_len > 1e-6:
+            # Compute viscosity term μ_ij
+            dot_vr = wp.dot(v_ij, r_ij)
+            epsilon = 0.01 * smoothing_radius * smoothing_radius
+            mu = smoothing_radius * dot_vr / (r_len * r_len + epsilon)
 
-            if wp.dot(v_ij, r_ij) < 0:  # Approaching particles
-                c_i = 1.0  # Approximate sound speed (will be passed as parameter)
-                c_j = 1.0
-                avg_c = 0.5 * (c_i + c_j)
+            if dot_vr < 0:  # Approaching particles
+                avg_c = sound_speed  # Use solver sound speed
                 avg_rho = 0.5 * (rho_i + rho_j)
 
-                viscosity_term = (-alpha * avg_c * mu + alpha * mu * mu) / avg_rho
+                # Monaghan artificial viscosity with β = α/2 for stability
+                beta = alpha * 0.5
+                viscosity_term = (-alpha * avg_c * mu + beta * mu * mu) / avg_rho
 
-                laplacian = kernel_viscosity_laplacian(r_len, smoothing_radius)
-                force += m_j * viscosity_term * laplacian * wp.normalize(r_ij)
+                # Viscosity force is symmetric
+                grad_w = kernel_spiky_gradient(r_ij, smoothing_radius)
+                force += m_j * viscosity_term * grad_w
+
+    forces[tid] = force
 
     forces[tid] = force
 

@@ -375,6 +375,7 @@ class SolverSPH(SolverBase):
                     model.particle_mass,
                     model.particle_grid.id if model.particle_grid else 0,
                     self.smoothing_radius,
+                    self.sound_speed,
                     self.viscosity,
                 ],
                 outputs=[viscosity_forces],
