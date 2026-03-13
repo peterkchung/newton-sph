@@ -62,7 +62,6 @@ import warp as wp
 from ...core.types import override
 from ...sim import Contacts, Control, Model, ModelBuilder, State
 from ..flags import SolverNotifyFlags
-from ..semi_implicit.kernels_contact import eval_particle_body_contact_forces
 from ..solver import SolverBase
 from .sph_kernels import (
     compute_cohesion_force,
@@ -279,16 +278,12 @@ class SolverSPH(SolverBase):
                 # Add SPH forces to particle_f
                 wp.copy(state_out.particle_f, self.sph_forces)
 
-            # 7. Apply particle-body contact forces for two-way coupling
-            if self.enable_rigid_coupling and model.body_count > 0 and contacts is not None:
-                eval_particle_body_contact_forces(
-                    model=model,
-                    state=state_in,
-                    contacts=contacts,
-                    particle_f=state_out.particle_f,
-                    body_f=state_out.body_f,
-                    body_f_in_world_frame=False,
-                )
+            # 7. Particle-body coupling
+            # Note: Full two-way coupling requires specialized SPH boundary handling.
+            # For now, the solver focuses on particle-particle SPH physics.
+            # Rigid body coupling can be achieved by:
+            #   a) Using SemiImplicit solver with SPH particles
+            #   b) Adding custom boundary kernels in future
 
             # 8. Integrate particles
             self._integrate(state_in, state_out, dt)
@@ -457,9 +452,16 @@ class SolverSPH(SolverBase):
     ) -> None:
         """Apply two-way coupling between SPH particles and rigid bodies.
 
-        DEPRECATED: Two-way coupling is now handled by standard Newton
-        particle-body contact system (eval_particle_body_contact_forces).
-        This method is kept for future specialized SPH-specific coupling.
+        PLACEHOLDER: This method is reserved for future SPH-specific
+        fluid-solid coupling implementations, such as:
+            - Ghost particle boundary conditions
+            - Mirror boundary conditions
+            - Specialized pressure transfer to bodies
+
+        Currently, the SolverSPH focuses on particle-particle SPH physics.
+        For fluid-rigid coupling, users can:
+            1. Use SolverSemiImplicit which has built-in particle-body contacts
+            2. Implement custom boundary handling in this method
 
         Args:
             state_in: Input state
@@ -467,9 +469,8 @@ class SolverSPH(SolverBase):
             contacts: Contact information (may be None)
             dt: Time step
         """
-        # Two-way coupling implemented via eval_particle_body_contact_forces
-        # in the main step() method. This placeholder remains for future
-        # SPH-specific boundary models (e.g., ghost particles, mirror BCs).
+        # Reserved for future SPH-specific boundary models.
+        # For standard particle-body interaction, use SolverSemiImplicit.
         pass
 
     def _store_sph_data(self, state: State) -> None:
